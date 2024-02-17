@@ -1,0 +1,16 @@
+path: ../datasets/nwpu vhr-10  # dataset root dir
+val: images
+train: images
+test:
+names:
+- airplane
+- ship
+- storage tank
+- baseball diamond
+- tennis court
+- basketball court
+- ground track field
+- harbor
+- bridge
+- vehicle
+nc: 10

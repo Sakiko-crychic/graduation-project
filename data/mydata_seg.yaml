@@ -1,0 +1,12 @@
+path: ../datasets/myproject  # dataset root dir
+val: train/images
+train: train/images
+test: train/images
+
+names:
+  0: hit_main_building
+  1: sports_ground
+  2: street
+  3: tree
+  4: water
+
