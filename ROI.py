@@ -1,1 +1,0 @@
-#region of interest 对segment/predict.py画出的分割区域进行下一步操作
