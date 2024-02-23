@@ -5,6 +5,17 @@ from pathlib import Path
 import sys
 import os
 
+# 参数调整
+#图像分辨率设置
+resolution = 1
+# 定义最小长度
+min_length = 30  # 可根据需要调整
+# Sobel算子参数
+ksize = 5  # Sobel核大小
+threshold_value = 2050  # 二值化阈值
+#阴影消除
+ShadowThresholding=225 #阴影消除二值化阈值
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -22,6 +33,11 @@ image_path = ROOT / "data/seg-images/0096.jpg"
 print("Reading image:", image_path)
 image = cv2.imread(str(image_path))
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+# 读取位置信息
+regions_file_path = ROOT / "runs/predict-seg/exp3/labels/0096.txt"
+print("Reading regions file:", regions_file_path)
+with open(str(regions_file_path), 'r') as file:
+    regions = file.readlines()
 
 # 全局二值化
 _, thresholded = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
@@ -35,25 +51,26 @@ dilated_eroded = cv2.morphologyEx(blurred, cv2.MORPH_CLOSE, kernel)
 
 # 阴影消除
 # 对膨胀和腐蚀后的图像进行阈值分割，将阴影和非阴影区域分离
-_, shadow_mask = cv2.threshold(dilated_eroded, 240, 255, cv2.THRESH_BINARY)
+_, shadow_mask = cv2.threshold(dilated_eroded,ShadowThresholding, 255, cv2.THRESH_BINARY)
 
 # 将阴影区域反转，得到阴影区域的掩码
 shadow_mask = cv2.bitwise_not(shadow_mask)
 
 # 使用阴影掩码，将原始图像中的阴影部分填充为背景色
-image_no_shadow = cv2.inpaint(image, shadow_mask, inpaintRadius=3, flags=cv2.INPAINT_TELEA)
+image_no_shadow = cv2.inpaint(image, shadow_mask, inpaintRadius=9, flags=cv2.INPAINT_TELEA)
+gray = cv2.cvtColor(image_no_shadow, cv2.COLOR_BGR2GRAY)
+# 全局二值化
+_, thresholded = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
 
+# 高斯滤波
+blurred = cv2.GaussianBlur(thresholded, (7, 7), 0)
 
+# 膨胀和腐蚀处理
+kernel = np.ones((7, 7), np.uint8)
+dilated_eroded = cv2.morphologyEx(blurred, cv2.MORPH_CLOSE, kernel)
 # 打印消除阴影后的图像
 cv2.imshow('Image without Shadow', image_no_shadow)
-cv2.waitKey(0)
-
-
-# 读取位置信息
-regions_file_path = ROOT / "runs/predict-seg/exp3/labels/0096.txt"
-print("Reading regions file:", regions_file_path)
-with open(str(regions_file_path), 'r') as file:
-    regions = file.readlines()
+cv2.imshow('Image with erode', dilated_eroded)
 
 # 获取图像的宽度和高度
 image_height, image_width = image_no_shadow.shape[:2]
@@ -76,10 +93,6 @@ for region_info in regions:
 
         # 添加到Sobel算子应用的区域列表中
         sobel_regions.append(pts)
-
-# Sobel算子参数
-ksize = 5  # Sobel核大小
-threshold_value = 1750  # 二值化阈值
 
 # 生成一张空白图像用于叠加边缘检测结果
 edges_combined = np.zeros_like(gray)
@@ -118,21 +131,17 @@ cv2.drawContours(contour_image, contours, -1, (0, 255, 0), 2)
 # 显示带有轮廓的图像
 cv2.imshow('Contours', contour_image)
 
-resolution = 1
-# 定义最小长度
-min_length = 30  # 可根据需要调整
-
 # 在原始图像上绘制轮廓并标注每条边的长度
 for contour in contours:
     # 对轮廓进行多边形逼近，减少多边形的顶点数目，以减少凹凸部分造成的短线段
-    epsilon = 0.0025 * cv2.arcLength(contour, True)  # 调整epsilon的值，使得多边形逼近更加接近原始轮廓
+    epsilon = 0.002365 * cv2.arcLength(contour, True)  # 调整epsilon的值，使得多边形逼近更加接近原始轮廓
     approx = cv2.approxPolyDP(contour, epsilon, True)
 
     # 获取逼近后的多边形的所有点
     points = approx.squeeze()
 
     # 计算每条边的长度并绘制标注
-    for i in range(len(points)):
+    for i in range(0, len(points)):
         pt1 = points[i]
         pt2 = points[(i + 1) % len(points)]  # 循环取下一个点
         length_pixels = np.linalg.norm(pt2 - pt1)  # 计算两点之间的距离作为边长
